@@ -1,0 +1,34 @@
+---
+title: "code"
+author: "Shahar Chaikin"
+date: "2024-10-24"
+output: html_document
+---
+In this code I will provide measure of fish species depth range (1) and depth niche (2) in both the Red Sea and Mediterranean Sea. The overarching goal is to provide a refinde information regarding species depths and compare to current knowledge avilable in FishBase.
+
+Libraries
+```{r}
+library(tidyverse)
+library(eHOF)
+library(rfishbase)
+```
+
+Data
+```{r}
+data_bruvs=read.csv("C:\\Users\\User\\Desktop\\research\\phd\\projects\\invasiveness_red_med\\project_folders\\data_wrangling_clean_output\\med_red_MaxN_data.csv")
+```
+
+Extract fishbase depths
+```{r}
+sp_list=data_bruvs %>% 
+  distinct(species) %>% 
+  separate_wider_delim(species, delim = " ", names = c("Genus", "Species"),cols_remove = F) %>% 
+  left_join(fb_tbl(tbl="species") %>% 
+              select(SpecCode,Genus,Species),by = c("Genus","Species"))
+
+fishbase_depths=estimate(species_list = sp_list$species,fields = c("SpecCode","ComDepthMin","ComDepthMax","ComDepMinObserved","ComDepMaxObserved","DepthMin","DepthMax","DepthMinEstimate","DepthMaxEstimate")) %>% 
+  left_join(sp_list %>% select(SpecCode,species),
+            by="SpecCode") %>% 
+  relocate(last_col())
+```
+
