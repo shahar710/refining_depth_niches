@@ -18,6 +18,17 @@ Data
 data_bruvs=read.csv("C:\\Users\\User\\Desktop\\research\\phd\\projects\\invasiveness_red_med\\project_folders\\data_wrangling_clean_output\\med_red_MaxN_data.csv")
 ```
 
+Extract raw depth ranges using BRUVs data per sea
+```{r}
+bruvs_raw_depth=data_bruvs %>% 
+  group_by(sea,species) %>% 
+  summarise(min_depth=min(depth),
+            max_depth=max(depth),
+            occ=n()) %>% 
+  filter(occ>1)
+```
+
+
 Extract fishbase depths
 ```{r}
 sp_list=data_bruvs %>% 
