@@ -4,7 +4,7 @@ author: "Shahar Chaikin"
 date: "2024-10-24"
 output: html_document
 ---
-In this code I will provide measure of fish species depth range (1) and depth niche (2) in both the Red Sea and Mediterranean Sea. The overarching goal is to provide a refinde information regarding species depths and compare to current knowledge avilable in FishBase.
+In this code I will provide measures of fish species depth range (1) and depth niche (2) in both the Red Sea and Mediterranean Sea. The overarching goal is to provide a refined information regarding species depths and compare to current knowledge available in FishBase.
 
 Libraries
 ```{r}
@@ -13,7 +13,7 @@ library(eHOF)
 library(rfishbase)
 ```
 
-Data
+#Data
 ```{r}
 data_bruvs=read.csv("C:\\Users\\User\\Desktop\\research\\phd\\projects\\invasiveness_red_med\\project_folders\\data_wrangling_clean_output\\med_red_MaxN_data.csv")
 ```
@@ -28,18 +28,116 @@ bruvs_raw_depth=data_bruvs %>%
   filter(occ>1)
 ```
 
-
 Extract fishbase depths
 ```{r}
+#Species list to be used
 sp_list=data_bruvs %>% 
   distinct(species) %>% 
   separate_wider_delim(species, delim = " ", names = c("Genus", "Species"),cols_remove = F) %>% 
-  left_join(fb_tbl(tbl="species") %>% 
+  left_join(fb_tbl(tbl="species") %>% #Extracting the FishBase SpecCode of the species
               select(SpecCode,Genus,Species),by = c("Genus","Species"))
 
+#Use the above sp_list to extract depth info from FishBase
 fishbase_depths=estimate(species_list = sp_list$species,fields = c("SpecCode","ComDepthMin","ComDepthMax","ComDepMinObserved","ComDepMaxObserved","DepthMin","DepthMax","DepthMinEstimate","DepthMaxEstimate")) %>% 
   left_join(sp_list %>% select(SpecCode,species),
             by="SpecCode") %>% 
   relocate(last_col())
+```
+
+#Raw depth estimates
+Combine raw depths with FishBase information
+```{r}
+bruvs_raw_fishbase=bruvs_raw_depth %>% 
+  left_join(fishbase_depths, by="species") %>% 
+  mutate(novel_min_depth=case_when(min_depth<DepthMin~"yes",
+                                   TRUE ~"no"),
+         novel_max_depth=case_when(max_depth>DepthMax~"yes",
+                                   TRUE ~"no"),
+         either_min_max=case_when(
+      novel_min_depth == "yes" | novel_max_depth == "yes" ~ "yes",
+      TRUE ~ "no"),
+      max_depth_diff=max_depth-DepthMax)
+```
+
+Plot it
+```{r}
+#Mediterranean Sea
+med_p=ggplot(bruvs_raw_fishbase %>% 
+         filter(either_min_max%in%"yes",
+                sea%in%"med"))+
+  geom_linerange(aes(y=reorder(species,max_depth_diff),
+                     xmin=min_depth,
+                     xmax=max_depth),
+                 color="blue",
+                 size=2.5)+
+  geom_linerange(aes(y=reorder(species,max_depth_diff),
+                     xmin=DepthMin,
+                     xmax=DepthMax),
+                 color="grey",
+                 size=1.2)+
+  labs(title="A) Mediterranean Sea",x="Depth (m)",y="Species")+
+  theme_bw()+
+  theme(axis.text.y = element_text(face = "italic"))+
+  coord_cartesian(xlim=c(0,200))
+
+#Red Sea
+red_p=ggplot(bruvs_raw_fishbase %>% 
+         filter(either_min_max%in%"yes",
+                sea%in%"red"))+
+  geom_linerange(aes(y=reorder(species,max_depth_diff),
+                     xmin=min_depth,
+                     xmax=max_depth),
+                 color="red",
+                 size=2.5)+
+  geom_linerange(aes(y=reorder(species,max_depth_diff),
+                     xmin=DepthMin,
+                     xmax=DepthMax),
+                 color="grey",
+                 size=1.2)+
+  labs(title="A) Red Sea",x="Depth (m)",y="Species")+
+  theme_bw()+
+  theme(axis.text.y = element_text(face = "italic"))+
+  coord_cartesian(xlim=c(0,200))
+```
+
+Combine two plots
+```{r}
+both_seas_raw_p=gridExtra::grid.arrange(med_p, red_p,
+                        ncol = 1,layout_matrix = rbind(c(1),
+                                                       c(2),
+                                                       c(2),
+                                                       c(2)))
+#ggsave(plot = both_seas_raw_p, filename = "both_seas_raw_p.png",device ="jpeg",height = 25,width = 20, units = "cm",dpi = 600)
+```
+
+#Central depth niches
+##Get the rae data prepared for modelling with zeros
+```{r}
+#Mediterranean Sea
+data_bruvs_with_zeros_med=data_bruvs %>% 
+  filter(sea%in%"med") %>% 
+  select(OpCode,
+         species,
+         MaxN) %>% 
+  spread(key = species,
+         value = MaxN,
+         fill = 0) %>% 
+  gather(key = species,value = MaxN,2:71) %>% 
+  left_join(data_bruvs %>% 
+              distinct(OpCode,sea,depth),
+            by="OpCode")
+#Red Sea
+data_bruvs_with_zeros_red=data_bruvs %>% 
+  filter(sea%in%"red") %>% 
+  select(OpCode,
+         species,
+         MaxN) %>% 
+  spread(key = species,
+         value = MaxN,
+         fill = 0) %>% 
+  gather(key = species,value = MaxN,2:174) %>% 
+  left_join(data_bruvs %>% 
+              distinct(OpCode,sea,depth),
+            by="OpCode")
 ```
 
