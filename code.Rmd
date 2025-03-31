@@ -9,7 +9,6 @@ In this code I will provide measures of fish species depth range (1) and depth n
 Libraries
 ```{r}
 library(tidyverse)
-library(eHOF)
 library(rfishbase)
 ```
 
@@ -23,9 +22,10 @@ Extract raw depth ranges using BRUVs data per sea
 bruvs_raw_depth=data_bruvs %>% 
   group_by(sea,species) %>% 
   summarise(min_depth=min(depth),
+            median_depth=median(depth),
             max_depth=max(depth),
-            occ=n()) %>% 
-  filter(occ>1)
+            occ=n()) #%>% 
+ # filter(occ>1)
 ```
 
 Extract fishbase depths
@@ -82,15 +82,35 @@ fishbase_depths=estimate(species_list = sp_list$fb_species_binom,fields = c("Spe
 Combine raw depths with FishBase information
 ```{r}
 bruvs_raw_vs_fishbase=bruvs_raw_depth %>% 
-  left_join(fishbase_depths, by="fb_species_binom") %>% 
+  left_join(fishbase_depths, by="species") %>% 
   mutate(novel_min_depth=case_when(min_depth<DepthMin~"yes",
                                    TRUE ~"no"),
          novel_max_depth=case_when(max_depth>DepthMax~"yes",
                                    TRUE ~"no"),
          either_min_max=case_when(
       novel_min_depth == "yes" | novel_max_depth == "yes" ~ "yes",
+      species%in%"Thamnaconus erythraeensis"~"yes",
       TRUE ~ "no"),
-      max_depth_diff=max_depth-DepthMax)
+      max_depth_diff=max_depth-DepthMax,
+      rare_record_min=case_when(median_depth<DepthMin~"yes",
+                                   TRUE ~"no"),
+         rare_record_max=case_when(median_depth>DepthMax~"yes",
+                                   TRUE ~"no"),
+         rare_either_min_max=case_when(
+      rare_record_min == "yes" | rare_record_max == "yes" ~ "yes",
+      TRUE ~ "no")) %>% 
+  select(-c(DepthMinEstimate,DepthMaxEstimate,ComDepMinObserved,ComDepMaxObserved,species)) %>% 
+  relocate(fb_species_binom, .after=sea)
+
+#How many species have distinct records?
+bruvs_raw_vs_fishbase %>% 
+  group_by(sea,either_min_max) %>% 
+  summarise(n=n())
+
+#How many species have distinct records?
+bruvs_raw_vs_fishbase %>% 
+  group_by(sea,novel_max_depth) %>% 
+  summarise(n=n())
 ```
 
 Plot it
@@ -109,10 +129,18 @@ med_p=ggplot(bruvs_raw_vs_fishbase %>%
                      xmax=DepthMax),
                  color="grey",
                  size=1.2)+
+  geom_point(data=bruvs_raw_vs_fishbase %>% 
+         filter(either_min_max%in%"yes",
+                sea%in%"med",
+                occ==1),
+         aes(x=median_depth,y=fb_species_binom),
+                 color="blue")+
   labs(title="A) Mediterranean Sea",x="Depth (m)",y="Species")+
   theme_bw()+
   theme(axis.text.y = element_text(face = "italic"))+
-  coord_cartesian(xlim=c(0,200))
+  coord_cartesian(xlim=c(0,160))
+med_p
+ggsave(plot = med_p, filename = "med_p.png",device ="jpeg",height = 15,width = 10, units = "cm",dpi = 600)
 
 #Red Sea
 red_p=ggplot(bruvs_raw_vs_fishbase %>% 
@@ -128,10 +156,18 @@ red_p=ggplot(bruvs_raw_vs_fishbase %>%
                      xmax=DepthMax),
                  color="grey",
                  size=1.2)+
+  geom_point(data=bruvs_raw_vs_fishbase %>% 
+         filter(either_min_max%in%"yes",
+                sea%in%"red",
+                occ==1),
+         aes(x=median_depth,y=fb_species_binom),
+                 color="red")+
   labs(title="A) Red Sea",x="Depth (m)",y="Species")+
   theme_bw()+
   theme(axis.text.y = element_text(face = "italic"))+
-  coord_cartesian(xlim=c(0,200))
+  coord_cartesian(xlim=c(0,160))
+red_p
+ggsave(plot = red_p, filename = "red_p.png",device ="jpeg",height = 30,width = 20, units = "cm",dpi = 600)
 ```
 
 Combine two plots
@@ -140,14 +176,18 @@ both_seas_raw_p=
   gridExtra::grid.arrange(left="Species",
                           bottom="Depth (m)",
                           med_p+
+                            labs(title="A) Mediterranean Sea")+
                             theme(
                               axis.title.x = element_blank(),
                               axis.title.y = element_blank()),
                           red_p+
+                            labs(title="B) Red Sea")+
                             theme(
                               axis.title.x = element_blank(),
                               axis.title.y = element_blank()),
                         ncol = 1,layout_matrix = rbind(c(1),
+                                                       c(2),
+                                                       c(2),
                                                        c(2),
                                                        c(2),
                                                        c(2)))
