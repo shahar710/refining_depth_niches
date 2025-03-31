@@ -37,9 +37,43 @@ sp_list=data_bruvs %>%
   left_join(fb_tbl(tbl="species") %>% #Extracting the FishBase SpecCode of the species
               select(SpecCode,Genus,Species),by = c("Genus","Species"))
 
+##Add some code manually for species with NAs
+t_grabata=8969
+T_erythraeensis="No records"
+C_fulvoguttatus=1926
+C_dimidiata=11861
+
+sp_list=sp_list %>% 
+  mutate(SpecCode=case_when(
+    species%in%"Taeniura grabata"~t_grabata,
+    #species%in%"Thamnaconus erythraeensis"~T_erythraeensis,
+    species%in%"Carangoides fulvoguttatus"~C_fulvoguttatus,
+    species%in%"Chromis dimidiata"~C_dimidiata,
+    TRUE~SpecCode)) %>% 
+  left_join(fb_tbl(tbl="species") %>% #update sp_names by FB
+              select(SpecCode,fb_Genus=Genus,fb_Species=Species),
+            by = c("SpecCode")) %>% 
+  mutate(fb_Genus=case_when(
+    Genus%in%"Thamnaconus"~"Thamnaconus",
+                            TRUE~fb_Genus),
+         fb_Species=case_when(
+           Species%in%"erythraeensis"~"erythraeensis",
+                            TRUE~fb_Species),
+    fb_species_binom=paste(fb_Genus,fb_Species),
+    updated_name=fb_species_binom==species)
+
+
+#Update names in bruvs data as well
+bruvs_raw_depth=bruvs_raw_depth %>% 
+  left_join(sp_list %>%
+              select(species,fb_species_binom),
+            by="species")
+```
+
 #Use the above sp_list to extract depth info from FishBase
-fishbase_depths=estimate(species_list = sp_list$species,fields = c("SpecCode","ComDepthMin","ComDepthMax","ComDepMinObserved","ComDepMaxObserved","DepthMin","DepthMax","DepthMinEstimate","DepthMaxEstimate")) %>% 
-  left_join(sp_list %>% select(SpecCode,species),
+```{r}
+fishbase_depths=estimate(species_list = sp_list$fb_species_binom,fields = c("SpecCode","ComDepthMin","ComDepthMax","ComDepMinObserved","ComDepMaxObserved","DepthMin","DepthMax","DepthMinEstimate","DepthMaxEstimate")) %>% 
+  left_join(sp_list %>% select(SpecCode,species=fb_species_binom),
             by="SpecCode") %>% 
   relocate(last_col())
 ```
@@ -47,8 +81,8 @@ fishbase_depths=estimate(species_list = sp_list$species,fields = c("SpecCode","C
 #Raw depth estimates
 Combine raw depths with FishBase information
 ```{r}
-bruvs_raw_fishbase=bruvs_raw_depth %>% 
-  left_join(fishbase_depths, by="species") %>% 
+bruvs_raw_vs_fishbase=bruvs_raw_depth %>% 
+  left_join(fishbase_depths, by="fb_species_binom") %>% 
   mutate(novel_min_depth=case_when(min_depth<DepthMin~"yes",
                                    TRUE ~"no"),
          novel_max_depth=case_when(max_depth>DepthMax~"yes",
@@ -62,15 +96,15 @@ bruvs_raw_fishbase=bruvs_raw_depth %>%
 Plot it
 ```{r}
 #Mediterranean Sea
-med_p=ggplot(bruvs_raw_fishbase %>% 
+med_p=ggplot(bruvs_raw_vs_fishbase %>% 
          filter(either_min_max%in%"yes",
                 sea%in%"med"))+
-  geom_linerange(aes(y=reorder(species,max_depth_diff),
+  geom_linerange(aes(y=reorder(fb_species_binom,max_depth_diff),
                      xmin=min_depth,
                      xmax=max_depth),
                  color="blue",
                  size=2.5)+
-  geom_linerange(aes(y=reorder(species,max_depth_diff),
+  geom_linerange(aes(y=reorder(fb_species_binom,max_depth_diff),
                      xmin=DepthMin,
                      xmax=DepthMax),
                  color="grey",
@@ -81,15 +115,15 @@ med_p=ggplot(bruvs_raw_fishbase %>%
   coord_cartesian(xlim=c(0,200))
 
 #Red Sea
-red_p=ggplot(bruvs_raw_fishbase %>% 
+red_p=ggplot(bruvs_raw_vs_fishbase %>% 
          filter(either_min_max%in%"yes",
                 sea%in%"red"))+
-  geom_linerange(aes(y=reorder(species,max_depth_diff),
+  geom_linerange(aes(y=reorder(fb_species_binom,max_depth_diff),
                      xmin=min_depth,
                      xmax=max_depth),
                  color="red",
                  size=2.5)+
-  geom_linerange(aes(y=reorder(species,max_depth_diff),
+  geom_linerange(aes(y=reorder(fb_species_binom,max_depth_diff),
                      xmin=DepthMin,
                      xmax=DepthMax),
                  color="grey",
@@ -102,12 +136,22 @@ red_p=ggplot(bruvs_raw_fishbase %>%
 
 Combine two plots
 ```{r}
-both_seas_raw_p=gridExtra::grid.arrange(med_p, red_p,
+both_seas_raw_p=
+  gridExtra::grid.arrange(left="Species",
+                          bottom="Depth (m)",
+                          med_p+
+                            theme(
+                              axis.title.x = element_blank(),
+                              axis.title.y = element_blank()),
+                          red_p+
+                            theme(
+                              axis.title.x = element_blank(),
+                              axis.title.y = element_blank()),
                         ncol = 1,layout_matrix = rbind(c(1),
                                                        c(2),
                                                        c(2),
                                                        c(2)))
-#ggsave(plot = both_seas_raw_p, filename = "both_seas_raw_p.png",device ="jpeg",height = 25,width = 20, units = "cm",dpi = 600)
+ggsave(plot = both_seas_raw_p, filename = "both_seas_raw_p.png",device ="jpeg",height = 30,width = 20, units = "cm",dpi = 600)
 ```
 
 #Central depth niches
