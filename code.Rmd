@@ -106,7 +106,9 @@ bruvs_raw_vs_fishbase=bruvs_raw_depth %>%
       rare_record_min == "yes" | rare_record_max == "yes" ~ "yes",
       TRUE ~ "no")) %>% 
   select(-c(DepthMinEstimate,DepthMaxEstimate,ComDepMinObserved,ComDepMaxObserved,species)) %>% 
-  relocate(fb_species_binom, .after=sea)
+  relocate(fb_species_binom, .after=sea) %>% 
+  mutate(label=case_when(is_les%in%1~"*",
+                         TRUE~""))
 
 #How many species have distinct records?
 bruvs_raw_vs_fishbase %>% 
@@ -117,6 +119,17 @@ bruvs_raw_vs_fishbase %>%
 bruvs_raw_vs_fishbase %>% 
   group_by(sea,novel_max_depth) %>% 
   summarise(n=n())
+
+#On average, how much do we add to new maximum depths for species that were found deeper?
+bruvs_raw_vs_fishbase %>% 
+  filter(novel_max_depth%in%"yes") %>% 
+  ungroup() %>% 
+  summarise(n=n(),
+            mean_new_max_diff=mean(max_depth_diff),
+            max_new_max_diff=min(max_depth_diff),
+            min_new_max_diff=max(max_depth_diff),
+            conf_low=confint(lm(max_depth_diff~1))[1,1],
+            conf_high=confint(lm(max_depth_diff~1))[1,2])
 ```
 
 Plot it
@@ -128,19 +141,24 @@ med_p=ggplot(bruvs_raw_vs_fishbase %>%
   geom_linerange(aes(y=reorder(fb_species_binom,max_depth_diff),
                      xmin=min_depth,
                      xmax=max_depth),
-                 color="blue",
-                 size=2.5)+
+                 color="#55B1DE",
+                 size=2.5,
+                 alpha=0.75)+
   geom_linerange(aes(y=reorder(fb_species_binom,max_depth_diff),
                      xmin=DepthMin,
                      xmax=DepthMax),
-                 color="grey",
+                 color="#56575C",
                  size=1.2)+
   geom_point(data=bruvs_raw_vs_fishbase %>% 
          filter(either_min_max%in%"yes",
                 sea%in%"med",
                 occ==1),
          aes(x=median_depth,y=fb_species_binom),
-                 color="blue")+
+                 color="#55B1DE")+
+  geom_text(aes(y=fb_species_binom,x=-1.3,label=label),
+            vjust=0.8,
+            #hjust=-1,
+            size=6)+
   labs(title="A) Mediterranean Sea",x="Depth (m)",y="Species")+
   theme_bw()+
   theme(axis.text.y = element_text(face = "italic"))+
@@ -155,19 +173,25 @@ red_p=ggplot(bruvs_raw_vs_fishbase %>%
   geom_linerange(aes(y=reorder(fb_species_binom,max_depth_diff),
                      xmin=min_depth,
                      xmax=max_depth),
-                 color="red",
-                 size=2.5)+
+                 color="#F74520",
+                 size=2.5,
+                 alpha=0.75)+
   geom_linerange(aes(y=reorder(fb_species_binom,max_depth_diff),
                      xmin=DepthMin,
                      xmax=DepthMax),
-                 color="grey",
+                 color="#56575C",
                  size=1.2)+
   geom_point(data=bruvs_raw_vs_fishbase %>% 
          filter(either_min_max%in%"yes",
                 sea%in%"red",
                 occ==1),
          aes(x=median_depth,y=fb_species_binom),
-                 color="red")+
+                 color="#F74520")+
+  geom_text(aes(y=fb_species_binom,x=-1.3,label=label),
+            vjust=0.8,
+            #hjust=-1,
+            size=6)+
+  labs(title="A) Mediterranean Sea",x="Depth (m)",y="Species")+
   labs(title="A) Red Sea",x="Depth (m)",y="Species")+
   theme_bw()+
   theme(axis.text.y = element_text(face = "italic"))+
