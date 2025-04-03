@@ -14,13 +14,19 @@ library(rfishbase)
 
 #Data
 ```{r}
-data_bruvs=read.csv("C:\\Users\\User\\Desktop\\research\\phd\\projects\\invasiveness_red_med\\project_folders\\data_wrangling_clean_output\\med_red_MaxN_data.csv")
+#Add invasive state
+traits=readxl::read_excel(path = "C:\\Users\\User\\Desktop\\research\\phd\\projects\\invasiveness_red_med\\project_folders\\data\\Belmaker_Species_Traits.xlsx",sheet = 1)
+traits$Lessepsian=as.factor(traits$Lessepsian)
+
+data_bruvs=read.csv("C:\\Users\\User\\Desktop\\research\\phd\\projects\\invasiveness_red_med\\project_folders\\data_wrangling_clean_output\\med_red_MaxN_data.csv") %>% 
+  left_join(traits %>% select(species=Species_updated_name_fishbase,is_les=Lessepsian),
+            by="species")
 ```
 
 Extract raw depth ranges using BRUVs data per sea
 ```{r}
 bruvs_raw_depth=data_bruvs %>% 
-  group_by(sea,species) %>% 
+  group_by(sea,species,is_les) %>% 
   summarise(min_depth=min(depth),
             median_depth=median(depth),
             max_depth=max(depth),
@@ -32,7 +38,7 @@ Extract fishbase depths
 ```{r}
 #Species list to be used
 sp_list=data_bruvs %>% 
-  distinct(species) %>% 
+  distinct(species,is_les) %>% 
   separate_wider_delim(species, delim = " ", names = c("Genus", "Species"),cols_remove = F) %>% 
   left_join(fb_tbl(tbl="species") %>% #Extracting the FishBase SpecCode of the species
               select(SpecCode,Genus,Species),by = c("Genus","Species"))
@@ -104,7 +110,7 @@ bruvs_raw_vs_fishbase=bruvs_raw_depth %>%
 
 #How many species have distinct records?
 bruvs_raw_vs_fishbase %>% 
-  group_by(sea,either_min_max) %>% 
+  group_by(sea,either_min_max,is_les) %>% 
   summarise(n=n())
 
 #How many species have distinct records?
