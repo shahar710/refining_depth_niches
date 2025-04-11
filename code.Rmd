@@ -66,7 +66,7 @@ sp_list=sp_list %>%
            Species%in%"erythraeensis"~"erythraeensis",
                             TRUE~fb_Species),
     fb_species_binom=paste(fb_Genus,fb_Species),
-    updated_name=fb_species_binom==species)
+    updated_name=(fb_species_binom==species)*-1)
 
 
 #Update names in bruvs data as well
@@ -78,17 +78,19 @@ bruvs_raw_depth=bruvs_raw_depth %>%
 
 #Use the above sp_list to extract depth info from FishBase
 ```{r}
-fishbase_depths=estimate(species_list = sp_list$fb_species_binom,fields = c("SpecCode","ComDepthMin","ComDepthMax","ComDepMinObserved","ComDepMaxObserved","DepthMin","DepthMax","DepthMinEstimate","DepthMaxEstimate")) %>% 
-  left_join(sp_list %>% select(SpecCode,species=fb_species_binom),
-            by="SpecCode") %>% 
-  relocate(last_col())
+# fishbase_depths=estimate(species_list = sp_list$fb_species_binom,fields = c("SpecCode","ComDepthMin","ComDepthMax","ComDepMinObserved","ComDepMaxObserved","DepthMin","DepthMax","DepthMinEstimate","DepthMaxEstimate")) %>%
+#   left_join(sp_list %>% select(SpecCode,fb_species_binom),
+#             by="SpecCode") %>%
+#   relocate(last_col())
+# write.csv(fishbase_depths,"fishbase_depths.csv",row.names = F)
+fishbase_depths=read.csv("fishbase_depths.csv")
 ```
 
 #Raw depth estimates
 Combine raw depths with FishBase information
 ```{r}
 bruvs_raw_vs_fishbase=bruvs_raw_depth %>% 
-  left_join(fishbase_depths, by="species") %>% 
+  left_join(fishbase_depths, by="fb_species_binom") %>% 
   mutate(novel_min_depth=case_when(min_depth<DepthMin~"yes",
                                    TRUE ~"no"),
          novel_max_depth=case_when(max_depth>DepthMax~"yes",
@@ -96,6 +98,7 @@ bruvs_raw_vs_fishbase=bruvs_raw_depth %>%
          either_min_max=case_when(
       novel_min_depth == "yes" | novel_max_depth == "yes" ~ "yes",
       species%in%"Thamnaconus erythraeensis"~"yes",
+      species%in%"Pseudanthias gibbosus"~"yes",
       TRUE ~ "no"),
       max_depth_diff=max_depth-DepthMax,
       rare_record_min=case_when(median_depth<DepthMin~"yes",
@@ -130,6 +133,15 @@ bruvs_raw_vs_fishbase %>%
             min_new_max_diff=max(max_depth_diff),
             conf_low=confint(lm(max_depth_diff~1))[1,1],
             conf_high=confint(lm(max_depth_diff~1))[1,2])
+
+#How many species deep borders ends beofre 40?
+bruvs_raw_vs_fishbase %>% 
+  filter(novel_max_depth%in%"yes") %>% 
+  group_by(sea,species) %>% 
+  summarise(potential_scuba_bias=DepthMax<=40) %>% 
+  filter(!species%in%c("Thamnaconus erythraeensis","Pseudanthias gibbosus")) %>% 
+  group_by(sea) %>% 
+  summarise(n_sp=sum(potential_scuba_bias))
 ```
 
 Plot it
@@ -138,6 +150,9 @@ Plot it
 med_p=ggplot(bruvs_raw_vs_fishbase %>% 
          filter(either_min_max%in%"yes",
                 sea%in%"med"))+
+  geom_rect(aes(xmin=30,xmax=40,ymin=0,ymax=12)
+            ,alpha=0.05,
+            fill="grey")+
   geom_linerange(aes(y=reorder(fb_species_binom,max_depth_diff),
                      xmin=min_depth,
                      xmax=max_depth),
@@ -147,7 +162,7 @@ med_p=ggplot(bruvs_raw_vs_fishbase %>%
   geom_linerange(aes(y=reorder(fb_species_binom,max_depth_diff),
                      xmin=DepthMin,
                      xmax=DepthMax),
-                 color="#56575C",
+                 color="black",
                  size=1.2)+
   geom_point(data=bruvs_raw_vs_fishbase %>% 
          filter(either_min_max%in%"yes",
@@ -161,7 +176,10 @@ med_p=ggplot(bruvs_raw_vs_fishbase %>%
             size=6)+
   labs(title="A) Mediterranean Sea",x="Depth (m)",y="Species")+
   theme_bw()+
-  theme(axis.text.y = element_text(face = "italic"))+
+  theme(plot.margin = margin(5, 5, 5, 20),  # Left margin wider for long names
+        axis.text.y = element_text(face = "italic"),
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank())+
   coord_cartesian(xlim=c(0,160))
 med_p
 ggsave(plot = med_p, filename = "med_p.png",device ="jpeg",height = 15,width = 10, units = "cm",dpi = 600)
@@ -170,6 +188,9 @@ ggsave(plot = med_p, filename = "med_p.png",device ="jpeg",height = 15,width = 1
 red_p=ggplot(bruvs_raw_vs_fishbase %>% 
          filter(either_min_max%in%"yes",
                 sea%in%"red"))+
+  geom_rect(aes(xmin=30,xmax=40,ymin=0,ymax=87)
+            ,alpha=0.05,
+            fill="grey")+
   geom_linerange(aes(y=reorder(fb_species_binom,max_depth_diff),
                      xmin=min_depth,
                      xmax=max_depth),
@@ -179,7 +200,7 @@ red_p=ggplot(bruvs_raw_vs_fishbase %>%
   geom_linerange(aes(y=reorder(fb_species_binom,max_depth_diff),
                      xmin=DepthMin,
                      xmax=DepthMax),
-                 color="#56575C",
+                 color="black",
                  size=1.2)+
   geom_point(data=bruvs_raw_vs_fishbase %>% 
          filter(either_min_max%in%"yes",
@@ -191,36 +212,34 @@ red_p=ggplot(bruvs_raw_vs_fishbase %>%
             vjust=0.8,
             #hjust=-1,
             size=6)+
-  labs(title="A) Mediterranean Sea",x="Depth (m)",y="Species")+
-  labs(title="A) Red Sea",x="Depth (m)",y="Species")+
+  labs(title="B) Red Sea",x="Depth (m)",y="Species")+
   theme_bw()+
-  theme(axis.text.y = element_text(face = "italic"))+
+  theme(plot.margin = margin(5, 5, 5, 20),  # Left margin wider for long names
+        axis.text.y = element_text(face = "italic"),
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank())+
   coord_cartesian(xlim=c(0,160))
 red_p
-ggsave(plot = red_p, filename = "red_p.png",device ="jpeg",height = 30,width = 20, units = "cm",dpi = 600)
+ ggsave(plot = red_p, filename = "red_p.png",device ="jpeg",height = 30,width = 20, units = "cm",dpi = 600)
 ```
 
 Combine two plots
 ```{r}
-both_seas_raw_p=
-  gridExtra::grid.arrange(left="Species",
-                          bottom="Depth (m)",
-                          med_p+
-                            labs(title="A) Mediterranean Sea")+
-                            theme(
-                              axis.title.x = element_blank(),
-                              axis.title.y = element_blank()),
-                          red_p+
-                            labs(title="B) Red Sea")+
-                            theme(
-                              axis.title.x = element_blank(),
-                              axis.title.y = element_blank()),
-                        ncol = 1,layout_matrix = rbind(c(1),
+# Align plot widths
+aligned_plots <- cowplot::align_plots(med_p, red_p, align = "v")
+both_seas_raw_p=gridExtra::grid.arrange(
+  grobs = aligned_plots,
+  ncol = 1,
+  layout_matrix = rbind(c(1),
                                                        c(2),
                                                        c(2),
                                                        c(2),
                                                        c(2),
-                                                       c(2)))
+                                                       c(2)),
+  left = "Species",
+  bottom = "Depth (m)"
+)
+
 ggsave(plot = both_seas_raw_p, filename = "both_seas_raw_p.png",device ="jpeg",height = 30,width = 20, units = "cm",dpi = 600)
 ```
 
