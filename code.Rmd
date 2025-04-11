@@ -143,6 +143,45 @@ bruvs_raw_vs_fishbase %>%
   group_by(sea) %>% 
   summarise(n_sp=sum(potential_scuba_bias))
 ```
+#habitat
+```{r}
+habitat_fb=rfishbase::ecology(species_list = sp_list$fb_species_binom,
+                           server = "fishbase",
+                           fields = c("SpecCode","HardBottom","SoftBottom")) %>% 
+  left_join(sp_list %>% select(SpecCode,fb_species_binom),
+             by="SpecCode") %>%
+   relocate(last_col()) %>% 
+  mutate(obligator_hard=case_when(HardBottom%in%0 & SoftBottom%in%-1~"yes",
+                                  TRUE~"no"),
+         obligator_soft=case_when(HardBottom%in%-1 & SoftBottom%in%0~"yes",
+                                  TRUE~"no"),
+         generalist=case_when(HardBottom%in%0 & SoftBottom%in%0~"yes",
+                                  TRUE~"no"))
+
+habitat_bruv=data_bruvs %>% 
+  distinct(OpCode,
+         sea,
+         species) %>% 
+  left_join(readxl::read_excel("C:\\Users\\User\\Desktop\\research\\data\\phd_stereo_bruvs\\data\\Metadata.xlsx") %>% 
+              select(OpCode,seabed_form)) %>% 
+  group_by(species,seabed_form) %>% 
+  summarise(occ=n()) %>% 
+  spread(key = seabed_form,value = occ,fill = 0) %>% 
+  mutate(obligator_hard=case_when(consolidated>0 &
+                                    unconsolidated%in%0 &
+                                    both%in%0  ~"yes",
+                                  TRUE~"no"),
+         obligator_soft=case_when(consolidated%in%0 &
+                                    unconsolidated>0 &
+                                    both%in%0  ~"yes",
+                                  TRUE~"no"),
+         generalist=case_when(consolidated>0 &
+                                    unconsolidated>0 ~"yes",
+                                  TRUE~"no")) %>% 
+  left_join(sp_list %>%
+              select(species,fb_species_binom),
+            by="species")
+```
 
 Plot it
 ```{r}
