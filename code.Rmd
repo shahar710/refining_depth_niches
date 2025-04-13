@@ -20,7 +20,9 @@ traits$Lessepsian=as.factor(traits$Lessepsian)
 
 data_bruvs=read.csv("C:\\Users\\User\\Desktop\\research\\phd\\projects\\invasiveness_red_med\\project_folders\\data_wrangling_clean_output\\med_red_MaxN_data.csv") %>% 
   left_join(traits %>% select(species=Species_updated_name_fishbase,is_les=Lessepsian),
-            by="species")
+            by="species") %>% 
+  mutate(is_les=case_when(species%in%"Lethrinus borbonicus"~"1",
+                          TRUE~is_les))
 ```
 
 Extract raw depth ranges using BRUVs data per sea
@@ -142,6 +144,8 @@ bruvs_raw_vs_fishbase %>%
   filter(!species%in%c("Thamnaconus erythraeensis","Pseudanthias gibbosus")) %>% 
   group_by(sea) %>% 
   summarise(n_sp=sum(potential_scuba_bias))
+
+write.csv(bruvs_raw_vs_fishbase,"depth_range.csv",row.names = F)
 ```
 #habitat
 ```{r}
