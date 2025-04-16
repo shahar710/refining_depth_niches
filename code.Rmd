@@ -493,7 +493,7 @@ cat("All plots exported successfully to the '", output_folder, "' folder.\n", se
 
 ##All species - Para
 ###Med
-```{r}
+```{r eval=FALSE, include=FALSE}
 ehof_med_all_para=list()
 for (i in data_bruvs_with_zeros_med$species %>% unique){
   
@@ -568,11 +568,11 @@ central_borders_med_df =central_borders_med_df %>%
   select(-species) %>% 
   relocate(fb_species_binom, .before=model)
 
-write.csv(central_borders_med_df,"central_borders_med_df.csv",row.names = F)
+# write.csv(central_borders_med_df,"central_borders_med_df.csv",row.names = F)
 ```
 
 ###Red - Para
-```{r}
+```{r eval=FALSE, include=FALSE}
 ehof_red_all_para=list()
 for (i in data_bruvs_with_zeros_red$species %>% unique){
   
@@ -647,5 +647,89 @@ central_borders_red_df =central_borders_red_df %>%
   select(-species) %>% 
   relocate(fb_species_binom, .before=model)
 
-write.csv(central_borders_red_df,"central_borders_red_df.csv",row.names = F)
+# write.csv(central_borders_red_df,"central_borders_red_df.csv",row.names = F)
 ```
+
+Bind DFs
+```{r}
+central_borders_df=bind_rows(central_borders_med_df,
+                             central_borders_red_df) %>% 
+  rename(species=fb_species_binom) %>% 
+  mutate(opt_type=case_when(model%in%"I"~"No optimum",
+                            model%in%"II"~"Single point",
+                            model%in%"III"~"Depth section",
+                            model%in%"IV"~"Single point",
+                            model%in%"V"~"Single point")) %>% 
+  drop_na(species)
+#write.csv(central_borders_df,"central_borders_df.csv",row.names = F)
+```
+
+#ggplot example species
+```{r}
+#Model I
+G_j=tibble(
+  x=ehof_red_all$`Gymnothorax johnsoni`$x,
+  fitted=fitted(ehof_red_all$`Gymnothorax johnsoni`,model = "I"),
+  y=ehof_red_all$`Gymnothorax johnsoni`$y
+)
+G_j_p=ggplot(G_j)+
+  geom_point(aes(x=x,y=y),
+             color="grey",
+             size=1)+
+  geom_line(aes(x=x,y=fitted),
+            color="black",
+            size=1,
+            linejoin="round",
+            lineend="round")+
+  labs(x="Depth (m)",
+       y="Expected MaxN",
+       title=expression(paste("Model I - ", italic("Gymnothorax johnsoni"))))+
+  theme_classic()+
+  scale_y_continuous(breaks = seq(0,2,by=1))
+
+#Mpdel II - Thallasoma pavo
+T_p=tibble(
+  x=ehof_med_all$`Thalassoma pavo`$x,
+  fitted=fitted(ehof_med_all$`Thalassoma pavo`,model = "II"),
+  y=ehof_med_all$`Thalassoma pavo`$y
+)
+T_p_p=ggplot(T_p)+
+  geom_point(aes(x=x,y=y),
+             color="grey",
+             size=1)+
+  geom_line(aes(x=x,y=fitted),
+            color="red",
+            size=1,
+            linejoin="round",
+            lineend="round")+
+  labs(x="Depth (m)",
+       y="Expected MaxN",
+       title=expression(paste("Model II - ", italic("Thalassoma pavo"))))+
+  theme_classic()+
+  scale_y_continuous(breaks = seq(0,2,by=1))
+#Model III - Pagrus caeruleostictus
+P_c=tibble(
+  x=as.numeric(seq(0,150,by=1)),
+  predicted=as.numeric(predict(ehof_med_all$`Pagrus caeruleostictus`,model = "III",newdata = data.frame(x = 0:150))[,])
+)
+P_c_p=ggplot(P_c)+
+  # geom_point(aes(x=x,y=y),
+  #            color="grey",
+  #            size=1)+
+  geom_line(aes(x=x,y=predicted),
+            color="green",
+            size=1,
+            linejoin="round",
+            lineend="round")+
+  labs(x="Depth (m)",
+       y="Expected MaxN",
+       title=expression(paste("Model III - ", italic("Pagrus caeruleostictus"))))+
+  theme_classic()#+
+  #scale_y_continuous(breaks = seq(0,1,by=.25))
+P_c_p
+#Model IV - 
+
+#Model V - 
+```
+
+
