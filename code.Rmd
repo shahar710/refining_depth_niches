@@ -103,6 +103,7 @@ bruvs_raw_vs_fishbase=bruvs_raw_depth %>%
       species%in%"Pseudanthias gibbosus"~"yes",
       TRUE ~ "no"),
       max_depth_diff=max_depth-DepthMax,
+      min_depth_diff=DepthMin-min_depth,
       rare_record_min=case_when(median_depth<DepthMin~"yes",
                                    TRUE ~"no"),
          rare_record_max=case_when(median_depth>DepthMax~"yes",
@@ -120,7 +121,7 @@ bruvs_raw_vs_fishbase %>%
   group_by(sea,either_min_max,is_les) %>% 
   summarise(n=n())
 
-#How many species have distinct records?
+#How many species have distinct max depth?
 bruvs_raw_vs_fishbase %>% 
   group_by(sea,novel_max_depth) %>% 
   summarise(n=n())
@@ -136,6 +137,17 @@ bruvs_raw_vs_fishbase %>%
             conf_low=confint(lm(max_depth_diff~1))[1,1],
             conf_high=confint(lm(max_depth_diff~1))[1,2])
 
+#On average, how much do we add to new minimum depths for species that were found shallower?
+bruvs_raw_vs_fishbase %>% 
+  filter(novel_min_depth%in%"yes") %>% 
+  ungroup() %>% 
+  summarise(n=n(),
+            mean_new_max_diff=mean(min_depth_diff),
+            max_new_max_diff=min(min_depth_diff),
+            min_new_max_diff=max(min_depth_diff),
+            conf_low=confint(lm(min_depth_diff~1))[1,1],
+            conf_high=confint(lm(min_depth_diff~1))[1,2])
+
 #How many species deep borders ends beofre 40?
 bruvs_raw_vs_fishbase %>% 
   filter(novel_max_depth%in%"yes") %>% 
@@ -145,10 +157,10 @@ bruvs_raw_vs_fishbase %>%
   group_by(sea) %>% 
   summarise(n_sp=sum(potential_scuba_bias))
 
-write.csv(bruvs_raw_vs_fishbase,"depth_range.csv",row.names = F)
+#write.csv(bruvs_raw_vs_fishbase,"depth_range.csv",row.names = F)
 ```
 #habitat
-```{r}
+```{r eval=FALSE, include=FALSE}
 habitat_fb=rfishbase::ecology(species_list = sp_list$fb_species_binom,
                            server = "fishbase",
                            fields = c("SpecCode","HardBottom","SoftBottom")) %>% 
@@ -263,7 +275,7 @@ red_p=ggplot(bruvs_raw_vs_fishbase %>%
         axis.title.y = element_blank())+
   coord_cartesian(xlim=c(0,160))
 red_p
- ggsave(plot = red_p, filename = "red_p.png",device ="jpeg",height = 30,width = 20, units = "cm",dpi = 600)
+ # ggsave(plot = red_p, filename = "red_p.png",device ="jpeg",height = 30,width = 20, units = "cm",dpi = 600)
 ```
 
 Combine two plots
@@ -292,8 +304,11 @@ both_seas_raw_p=gridExtra::grid.arrange(
 #Mediterranean Sea
 data_bruvs_with_zeros_med=data_bruvs %>% 
   filter(sea%in%"med") %>% 
+  left_join(sp_list %>%
+              select(species,fb_species_binom),
+            by="species") %>% 
   select(OpCode,
-         species,
+         species=fb_species_binom,
          MaxN) %>% 
   spread(key = species,
          value = MaxN,
@@ -305,9 +320,12 @@ data_bruvs_with_zeros_med=data_bruvs %>%
 #Red Sea
 data_bruvs_with_zeros_red=data_bruvs %>% 
   filter(sea%in%"red") %>% 
+  left_join(sp_list %>%
+              select(species,fb_species_binom),
+            by="species") %>% 
   select(OpCode,
-         species,
-         MaxN) %>% 
+         species=fb_species_binom,
+         MaxN) %>%
   spread(key = species,
          value = MaxN,
          fill = 0) %>% 
@@ -317,38 +335,10 @@ data_bruvs_with_zeros_red=data_bruvs %>%
             by="OpCode")
 ```
 
-##eHOF models
-```{r eval=FALSE, include=FALSE}
-#Run eHOF
-#remotes::install_version("eHOF", version = "1.12")  # Replace with your desired version
-
-library(eHOF)
-ehof_med_test=HOF(
-   family=poisson,
-   grad=data_bruvs_with_zeros_med %>%
-     filter(species%in%"Dentex macrophthalmus") %>% 
-     select(depth) %>% pull(),
-   occ=data_bruvs_with_zeros_med %>% 
-     filter(species%in%"Dentex macrophthalmus") %>%
-     select(MaxN) %>% 
-     pull(),
-   M=data_bruvs_with_zeros_med %>%
-     filter(species%in%"Dentex macrophthalmus") %>%
-     summarise(max=max(MaxN)) %>%
-     pull(),
-   modeltypes=c("I","II","III","IV","V"))
-```
-
-```{r}
-plot(ehof_med_test,para = T)
-para_test=Para(ehof_med_test)
-para_test$centralBorder
-para_test$opt
-```
-
+#eHOF models
 ##All species - HOF
 ###Med
-```{r}
+```{r include=FALSE}
 ehof_med_all=list()
 for (i in data_bruvs_with_zeros_med$species %>% unique){
   
@@ -372,7 +362,7 @@ write_rds(ehof_med_all,"HOF_med_all.rds")
 ```
 
 ###Red
-```{r}
+```{r include=FALSE}
 ehof_red_all=list()
 for (i in data_bruvs_with_zeros_red$species %>% unique){
   
@@ -393,6 +383,112 @@ ehof_red_all[[i]]=HOF(
 }
 ehof_red_all
 write_rds(ehof_red_all,"HOF_red_all.rds")
+```
+
+Load HOF outputs
+```{r}
+HOF_med_all=read_rds("HOF_med_all.rds")
+HOF_red_all=read_rds("HOF_red_all.rds")
+```
+
+Plot species
+```{r}
+sp_to_plot_med=bruvs_raw_vs_fishbase %>% 
+  ungroup() %>% 
+  filter(occ>3,
+         sea%in%"med") %>% 
+  select(species) %>% 
+  pull()
+
+sp_to_plot_red=bruvs_raw_vs_fishbase %>% 
+  ungroup() %>% 
+  filter(occ>3,
+         sea%in%"red") %>% 
+  select(species) %>% 
+  pull()
+```
+
+Loop through all
+Med. Sea plots
+```{r}
+# Create the output folder if it doesn't exist
+output_folder <- "species_plots_med"
+if (!dir.exists(output_folder)) {
+  dir.create(output_folder)
+}
+
+# Loop through the species list and generate/export plots
+for (species_name in sp_to_plot_med) {
+  if (species_name %in% names(HOF_med_all)) {
+    plot_data <- HOF_med_all[[species_name]]
+    plot_filename <- file.path(output_folder, paste0(gsub(" ", "_", species_name), ".png"))
+
+    # Open a PNG device with specified resolution
+    png(filename = plot_filename, width = 1200, height = 800, res = 300)
+# Adjust plot margins using par()
+    par(mar = c(3, 3.5, 1, 3.5) + 0.1, # bottom, left, top, right margins
+        mgp = c(2, 0.8, 0),# Title on position 2, labels on 0.8, axis line on 0
+     # Control text sizes
+      cex.axis = .5,
+      cex.lab = .5,
+      cex.main = 1,
+      cex.legend = .7)
+    
+    # Create the plot
+    plot(plot_data, boxp = FALSE, main = species_name,
+         xlab = "Depth (m)", ylab = "Expected MaxN",para = F) # Add meaningful labels
+
+    # Close the PNG device to save the plot
+    dev.off()
+
+    cat(paste("Plot for", species_name, "exported to:", plot_filename, "\n"))
+  } else {
+    cat(paste("Warning: No data found for species:", species_name, "\n"))
+  }
+}
+
+cat("All plots exported successfully to the '", output_folder, "' folder.\n", sep = "")
+```
+
+Expord Red Sea plots
+Red Sea plots
+```{r}
+# Create the output folder if it doesn't exist
+output_folder <- "species_plots_red"
+if (!dir.exists(output_folder)) {
+  dir.create(output_folder)
+}
+
+# Loop through the species list and generate/export plots
+for (species_name in sp_to_plot_red) {
+  if (species_name %in% names(HOF_red_all)) {
+    plot_data <- HOF_red_all[[species_name]]
+    plot_filename <- file.path(output_folder, paste0(gsub(" ", "_", species_name), ".png"))
+
+    # Open a PNG device with specified resolution
+    png(filename = plot_filename, width = 1200, height = 800, res = 300)
+# Adjust plot margins using par()
+    par(mar = c(3, 3.5, 1, 3.5) + 0.1, # bottom, left, top, right margins
+        mgp = c(2, 0.8, 0),# Title on position 2, labels on 0.8, axis line on 0
+     # Control text sizes
+      cex.axis = .5,
+      cex.lab = .5,
+      cex.main = 1,
+      cex.legend = .7)
+    # Create the plot
+    plot(plot_data, boxp = FALSE, main = species_name,
+         xlab = "Depth (m)", ylab = "Expected MaxN") # Add meaningful labels
+
+    # Close the PNG device to save the plot
+    dev.off()
+
+    cat(paste("Plot for", species_name, "exported to:", plot_filename, "\n"))
+  } else {
+    cat(paste("Warning: No data found for species:", species_name, "\n"))
+  }
+}
+
+cat("All plots exported successfully to the '", output_folder, "' folder.\n", sep = "")
 ```
 
 ##All species - Para
@@ -417,7 +513,7 @@ ehof_med_all_para[[i]]=Para(HOF(
    modeltypes=c("I","II","III","IV","V")))
 }
 ehof_med_all_para
-#write_rds(ehof_med_all_para,"ehof_med_all_para.rds")
+write_rds(ehof_med_all_para,"ehof_med_all_para.rds")
 ```
 
 Transform to df
@@ -496,7 +592,7 @@ ehof_red_all_para[[i]]=Para(HOF(
    modeltypes=c("I","II","III","IV","V")))
 }
 ehof_red_all_para
-#write_rds(ehof_red_all_para,"ehof_red_all_para.rds")
+write_rds(ehof_red_all_para,"ehof_red_all_para.rds")
 ```
 
 Transform to df
