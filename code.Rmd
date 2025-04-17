@@ -667,69 +667,185 @@ central_borders_df=bind_rows(central_borders_med_df,
 #ggplot example species
 ```{r}
 #Model I
+#Model II - Thallasoma pavo
 G_j=tibble(
-  x=ehof_red_all$`Gymnothorax johnsoni`$x,
-  fitted=fitted(ehof_red_all$`Gymnothorax johnsoni`,model = "I"),
-  y=ehof_red_all$`Gymnothorax johnsoni`$y
-)
+  x=as.numeric(seq(0,150,by=1)),
+  predicted=as.numeric(predict(ehof_red_all$`Gymnothorax johnsoni`,model = "I",newdata = data.frame(x = 0:150))))
+#observed
+G_j_o=tibble(
+    x=ehof_red_all$`Gymnothorax johnsoni`$x,
+    y=ehof_red_all$`Gymnothorax johnsoni`$y)
+#plot
 G_j_p=ggplot(G_j)+
-  geom_point(aes(x=x,y=y),
-             color="grey",
-             size=1)+
-  geom_line(aes(x=x,y=fitted),
+  geom_point(data=G_j_o%>% 
+               filter(y%in%0),
+             aes(x=x,y=y),
+             shape=21,
+             size=1.5)+
+  geom_point(data=G_j_o %>% 
+               filter(y>0),
+             aes(x=x,y=y),
+             shape=21,
+             fill="black",
+             size=1.5)+
+  geom_line(aes(x=x,y=predicted*max(ehof_red_all$`Gymnothorax johnsoni`$y)),
             color="black",
             size=1,
             linejoin="round",
             lineend="round")+
   labs(x="Depth (m)",
        y="Expected MaxN",
-       title=expression(paste("Model I - ", italic("Gymnothorax johnsoni"))))+
-  theme_classic()+
-  scale_y_continuous(breaks = seq(0,2,by=1))
+       title=expression(paste("A) Model I - ", italic("Gymnothorax johnsoni"))))+
+  theme_classic()
+G_j_p
 
-#Mpdel II - Thallasoma pavo
+#Model II - Thallasoma pavo
 T_p=tibble(
-  x=ehof_med_all$`Thalassoma pavo`$x,
-  fitted=fitted(ehof_med_all$`Thalassoma pavo`,model = "II"),
-  y=ehof_med_all$`Thalassoma pavo`$y
-)
+  x=as.numeric(seq(0,150,by=1)),
+  predicted=as.numeric(predict(ehof_med_all$`Thalassoma pavo`,model = "II",newdata = data.frame(x = 0:150))[,]))
+#observed
+T_p_o=tibble(
+    x=ehof_med_all$`Thalassoma pavo`$x,
+    y=ehof_med_all$`Thalassoma pavo`$y)
+#plot
 T_p_p=ggplot(T_p)+
-  geom_point(aes(x=x,y=y),
-             color="grey",
-             size=1)+
-  geom_line(aes(x=x,y=fitted),
+  geom_point(data=T_p_o%>% 
+               filter(y%in%0),
+             aes(x=x,y=y),
+             shape=21,
+             size=1.5)+
+  geom_point(data=T_p_o %>% 
+               filter(y>0),
+             aes(x=x,y=y),
+             shape=21,
+             fill="black",
+             size=1.5)+
+  geom_line(aes(x=x,y=predicted*max(ehof_med_all$`Thalassoma pavo`$y)),
             color="red",
             size=1,
             linejoin="round",
             lineend="round")+
   labs(x="Depth (m)",
        y="Expected MaxN",
-       title=expression(paste("Model II - ", italic("Thalassoma pavo"))))+
-  theme_classic()+
-  scale_y_continuous(breaks = seq(0,2,by=1))
+       title=expression(paste("B) Model II - ", italic("Thalassoma pavo"))))+
+  theme_classic()
+T_p_p
+
 #Model III - Pagrus caeruleostictus
 P_c=tibble(
   x=as.numeric(seq(0,150,by=1)),
-  predicted=as.numeric(predict(ehof_med_all$`Pagrus caeruleostictus`,model = "III",newdata = data.frame(x = 0:150))[,])
-)
+  predicted=as.numeric(predict(ehof_med_all$`Pagrus caeruleostictus`,model = "III",newdata = data.frame(x = 0:150))[,]))
+#observed
+P_c_o=tibble(
+    x=ehof_med_all$`Pagrus caeruleostictus`$x,
+    y=ehof_med_all$`Pagrus caeruleostictus`$y)
+#plot
 P_c_p=ggplot(P_c)+
-  # geom_point(aes(x=x,y=y),
-  #            color="grey",
-  #            size=1)+
-  geom_line(aes(x=x,y=predicted),
+  geom_point(data=P_c_o%>% 
+               filter(y%in%0),
+             aes(x=x,y=y),
+             shape=21,
+             size=1.5)+
+  geom_point(data=P_c_o %>% 
+               filter(y>0),
+             aes(x=x,y=y),
+             shape=21,
+             fill="black",
+             size=1.5)+
+  geom_line(aes(x=x,y=predicted*max(ehof_med_all$`Pagrus caeruleostictus`$y)),
             color="green",
             size=1,
             linejoin="round",
             lineend="round")+
   labs(x="Depth (m)",
        y="Expected MaxN",
-       title=expression(paste("Model III - ", italic("Pagrus caeruleostictus"))))+
-  theme_classic()#+
-  #scale_y_continuous(breaks = seq(0,1,by=.25))
+       title=expression(paste("C) Model III - ", italic("Pagrus caeruleostictus"))))+
+  theme_classic()
 P_c_p
-#Model IV - 
+#Model IV - Tetrosomus gibbosus
+T_g=tibble(
+  x=as.numeric(seq(0,150,by=1)),
+  predicted=as.numeric(predict(ehof_red_all$`Tetrosomus gibbosus`,model = "IV",newdata = data.frame(x = 0:150))[,]))
+#observed
+T_g_o=tibble(
+    x=ehof_red_all$`Tetrosomus gibbosus`$x,
+    y=ehof_red_all$`Tetrosomus gibbosus`$y)
+#plot
+T_g_p=ggplot(T_g)+
+  geom_point(data=T_g_o%>% 
+               filter(y%in%0),
+             aes(x=x,y=y),
+             shape=21,
+             size=1.5)+
+  geom_point(data=T_g_o %>% 
+               filter(y>0),
+             aes(x=x,y=y),
+             shape=21,
+             fill="black",
+             size=1.5)+
+  geom_line(aes(x=x,y=predicted*max(ehof_red_all$`Tetrosomus gibbosus`$y)),
+            color="blue",
+            size=1,
+            linejoin="round",
+            lineend="round")+
+  labs(x="Depth (m)",
+       y="Expected MaxN",
+       title=expression(paste("D) Model IV - ", italic("Tetrosomus gibbosus"))))+
+  theme_classic()
+T_g_p
 
 #Model V - 
+N_r=tibble(
+  x=as.numeric(seq(0,150,by=1)),
+  predicted=as.numeric(predict(ehof_med_all$`Nemipterus randalli`,model = "V",newdata = data.frame(x = 0:150))[,]))
+#observed
+N_r_o=tibble(
+    x=ehof_med_all$`Nemipterus randalli`$x,
+    y=ehof_med_all$`Nemipterus randalli`$y)
+#plot
+N_r_p=ggplot(N_r)+
+  geom_point(data=N_r_o%>% 
+               filter(y%in%0),
+             aes(x=x,y=y),
+             shape=21,
+             size=1.5)+
+  geom_point(data=N_r_o %>% 
+               filter(y>0),
+             aes(x=x,y=y),
+             shape=21,
+             fill="black",
+             size=1.5)+
+  geom_line(aes(x=x,y=predicted*max(ehof_med_all$`Nemipterus randalli`$y)),
+            color="brown",
+            size=1,
+            linejoin="round",
+            lineend="round")+
+  labs(x="Depth (m)",
+       y="Expected MaxN",
+       title=expression(paste("E) Model V - ", italic("Nemipterus randalli"))))+
+  theme_classic()
+N_r_p
 ```
 
+Bind plots
+```{r}
+HOF_panel=gridExtra::grid.arrange(
+  G_j_p+
+    theme(axis.title = element_blank()),
+  T_p_p+
+    theme(axis.title = element_blank()),
+  P_c_p+
+    theme(axis.title = element_blank()),
+  T_g_p+
+    theme(axis.title = element_blank()),
+  N_r_p+
+    theme(axis.title = element_blank()),
+  layout_matrix = rbind(c(1,1,2,2,3,3),
+                        c(NA,4,4,5,5,NA)),
+  left = "Expected MaxN",
+  bottom = "Depth (m)"
+)
+
+ggsave(plot = HOF_panel, filename = "HOF_panel.png",device ="jpeg",height = 15,width = 25, units = "cm",dpi = 600)
+```
 
