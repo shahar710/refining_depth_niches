@@ -355,7 +355,8 @@ ehof_med_all[[i]]=HOF(
      filter(species%in%i) %>%
      summarise(max=max(MaxN)) %>%
      pull(),
-   modeltypes=c("I","II","III","IV","V"))
+   modeltypes=c("I","II","III","IV","V"),
+   bootstrap=999)
 }
 ehof_med_all
 write_rds(ehof_med_all,"HOF_med_all.rds")
@@ -497,20 +498,7 @@ cat("All plots exported successfully to the '", output_folder, "' folder.\n", se
 ehof_med_all_para=list()
 for (i in data_bruvs_with_zeros_med$species %>% unique){
   
-ehof_med_all_para[[i]]=Para(HOF(
-   family=poisson,
-   grad=data_bruvs_with_zeros_med %>%
-     filter(species%in%i) %>% 
-     select(depth) %>% pull(),
-   occ=data_bruvs_with_zeros_med %>% 
-     filter(species%in%i) %>%
-     select(MaxN) %>% 
-     pull(),
-   M=data_bruvs_with_zeros_med %>%
-     filter(species%in%i) %>%
-     summarise(max=max(MaxN)) %>%
-     pull(),
-   modeltypes=c("I","II","III","IV","V")))
+ehof_med_all_para[[i]]=Para(HOF_med_all[[i]])
 }
 ehof_med_all_para
 write_rds(ehof_med_all_para,"ehof_med_all_para.rds")
@@ -576,20 +564,7 @@ central_borders_med_df =central_borders_med_df %>%
 ehof_red_all_para=list()
 for (i in data_bruvs_with_zeros_red$species %>% unique){
   
-ehof_red_all_para[[i]]=Para(HOF(
-   family=poisson,
-   grad=data_bruvs_with_zeros_red %>%
-     filter(species%in%i) %>% 
-     select(depth) %>% pull(),
-   occ=data_bruvs_with_zeros_red %>% 
-     filter(species%in%i) %>%
-     select(MaxN) %>% 
-     pull(),
-   M=data_bruvs_with_zeros_red %>%
-     filter(species%in%i) %>%
-     summarise(max=max(MaxN)) %>%
-     pull(),
-   modeltypes=c("I","II","III","IV","V")))
+ehof_red_all_para[[i]]=Para(HOF_red_all[[i]])
 }
 ehof_red_all_para
 write_rds(ehof_red_all_para,"ehof_red_all_para.rds")
@@ -647,7 +622,7 @@ central_borders_red_df =central_borders_red_df %>%
   select(-species) %>% 
   relocate(fb_species_binom, .before=model)
 
-# write.csv(central_borders_red_df,"central_borders_red_df.csv",row.names = F)
+#write.csv(central_borders_red_df,"central_borders_red_df.csv",row.names = F)
 ```
 
 Bind DFs
